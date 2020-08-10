@@ -7,10 +7,13 @@ import (
 )
 
 func main() {
+	host := os.Getenv("DB_HOST")
+	dbName := os.Getenv("DB_NAME")
+	user := os.Getenv("DB_USER")
 	pass := os.Getenv("DB_PASS")
 	db, err := gorm.Open(
 		"postgres",
-		"host=students-db user=go password="+pass+" dbname=go sslmode=disable")
+		"host="+host+" user="+user+" password="+pass+" dbname="+dbName+" sslmode=disable")
 	if err != nil {
 		panic(err.Error())
 	}
