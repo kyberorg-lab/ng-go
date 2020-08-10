@@ -32,7 +32,7 @@ pipeline {
               script{
                   deployToKube(
                     namespace: 'dev-nggo',
-                    workloadName: 'nggo',
+                    workloadName: 'nggo-app',
                     imageRepo: env.DOCKER_REPO,
                     imageTag: env.BRANCH_NAME
                   )
