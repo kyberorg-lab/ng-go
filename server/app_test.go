@@ -136,7 +136,7 @@ func setupRouter(a App) *gin.Engine {
 	r.POST("/students", a.addStudent)
 	r.PUT("/students/:id", a.updateStudent)
 	r.DELETE("/students/:id", a.deleteStudent)
-	r.Static("/", "/webapp/dist/webapp/")
+	r.Static("/", "./webapp/dist/webapp/")
 	return r
 }
 
