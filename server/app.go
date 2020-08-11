@@ -26,7 +26,10 @@ func (a *App) start() {
 	a.r.POST("/students", a.addStudent)
 	a.r.PUT("/students/:id", a.updateStudent)
 	a.r.DELETE("/students/:id", a.deleteStudent)
-	a.r.Static("/", "./webapp/dist/webapp/")
+
+	a.r.StaticFS("/", http.Dir("./webapp/dist/webapp"))
+
+	//a.r.Static("/", "./webapp/dist/webapp/")
 	log.Fatal(a.r.Run(":8080"))
 }
 
