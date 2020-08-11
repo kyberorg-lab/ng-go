@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/sqlite"
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,9 +20,8 @@ func TestGetAllStudents(t *testing.T) {
 	app.db.Save(st)
 	req, _ := http.NewRequest("GET", "/students", nil)
 	r := httptest.NewRecorder()
-	handler := http.HandlerFunc(app.getAllStudents)
 
-	handler.ServeHTTP(r, req)
+	app.r.ServeHTTP(r, req)
 
 	checkStatusCode(r.Code, http.StatusOK, t)
 	checkContentType(r, t)
@@ -32,9 +33,8 @@ func TestAddStudent(t *testing.T) {
 	var rqBody = toReader(`{"name":"John Doe", "age":20}`)
 	req, _ := http.NewRequest("POST", "/students", rqBody)
 	r := httptest.NewRecorder()
-	handler := http.HandlerFunc(app.addStudent)
 
-	handler.ServeHTTP(r, req)
+	app.r.ServeHTTP(r, req)
 
 	checkStatusCode(r.Code, http.StatusCreated, t)
 	checkContentType(r, t)
@@ -48,9 +48,8 @@ func TestUpdateStudent(t *testing.T) {
 	req, _ := http.NewRequest("PUT", "/students/id", rqBody)
 	req = mux.SetURLVars(req, map[string]string{"id": "id-1"})
 	r := httptest.NewRecorder()
-	handler := http.HandlerFunc(app.updateStudent)
 
-	handler.ServeHTTP(r, req)
+	app.r.ServeHTTP(r, req)
 
 	checkStatusCode(r.Code, http.StatusOK, t)
 	checkContentType(r, t)
@@ -63,19 +62,12 @@ func TestDeleteStudent(t *testing.T) {
 	req, _ := http.NewRequest("DELETE", "/students/id", nil)
 	req = mux.SetURLVars(req, map[string]string{"id": "id-1"})
 	r := httptest.NewRecorder()
-	handler := http.HandlerFunc(app.deleteStudent)
 
-	handler.ServeHTTP(r, req)
+	app.r.ServeHTTP(r, req)
 
 	checkStatusCode(r.Code, http.StatusOK, t)
 	checkContentType(r, t)
 	checkDbIsEmpty(app.db, t)
-}
-
-func initApp() App {
-	db, _ := gorm.Open("sqlite3", ":memory:")
-	db.AutoMigrate(&student{})
-	return App{db: db}
 }
 
 func firstStudent(app App) student {
@@ -127,4 +119,28 @@ func checkDbIsEmpty(db *gorm.DB, t *testing.T) {
 	if len(students) != 0 {
 		t.Errorf("Student has not been deleted")
 	}
+}
+
+func initApp() App {
+	db, _ := gorm.Open("sqlite3", ":memory:")
+	db.AutoMigrate(&student{})
+
+	app := App{db: db}
+	app.r = setupRouter(app)
+	return app
+}
+
+func setupRouter(a App) *gin.Engine {
+	r := gin.Default()
+	r.GET("/students", a.getAllStudents)
+	r.POST("/students", a.addStudent)
+	r.PUT("/students/:id", a.updateStudent)
+	r.DELETE("/students/:id", a.deleteStudent)
+	r.Static("/", "/webapp/dist/webapp/")
+	return r
+}
+
+func main() {
+	a := initApp()
+	log.Fatal(a.r.Run(":8080"))
 }
