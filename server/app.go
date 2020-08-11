@@ -1,13 +1,14 @@
 package main
 
 import (
-	"encoding/json"
+	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/gorilla/mux"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"log"
 	"net/http"
+	"path"
+	"path/filepath"
 )
 
 type student struct {
@@ -18,74 +19,83 @@ type student struct {
 
 type App struct {
 	db *gorm.DB
-	r  *mux.Router
+	r  *gin.Engine
 }
 
 func (a *App) start() {
 	a.db.AutoMigrate(&student{})
-	a.r.HandleFunc("/students", a.getAllStudents).Methods("GET")
-	a.r.HandleFunc("/students", a.addStudent).Methods("POST")
-	a.r.HandleFunc("/students/{id}", a.updateStudent).Methods("PUT")
-	a.r.HandleFunc("/students/{id}", a.deleteStudent).Methods("DELETE")
-	a.r.PathPrefix("/").Handler(http.FileServer(http.Dir("./webapp/dist/webapp/")))
-	log.Fatal(http.ListenAndServe(":8080", a.r))
+	a.r.GET("/students", a.getAllStudents)
+	a.r.POST("/students", a.addStudent)
+	a.r.PUT("/students/:id", a.updateStudent)
+	a.r.DELETE("/students/:id", a.deleteStudent)
+
+	a.r.NoRoute(a.serveStatic)
+	log.Fatal(a.r.Run(":8080"))
 }
 
-func (a *App) getAllStudents(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func (a *App) serveStatic(c *gin.Context) {
+	dir, file := path.Split(c.Request.RequestURI)
+	ext := filepath.Ext(file)
+	if file == "" || ext == "" {
+		c.File("./webapp/dist/webapp/index.html")
+	} else {
+		c.File("./webapp/dist/webapp/" + path.Join(dir, file))
+	}
+}
+
+func (a *App) getAllStudents(context *gin.Context) {
+	context.Header("Content-Type", "application/json")
 	var all []student
 	err := a.db.Find(&all).Error
 	if err != nil {
-		sendErr(w, http.StatusInternalServerError, err.Error())
+
+		sendErr(context, http.StatusInternalServerError, err.Error())
 		return
 	}
-	err = json.NewEncoder(w).Encode(all)
-	if err != nil {
-		sendErr(w, http.StatusInternalServerError, err.Error())
-	}
+	context.JSON(http.StatusOK, all)
 }
 
-func (a *App) addStudent(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func (a *App) addStudent(context *gin.Context) {
+	context.Header("Content-Type", "application/json")
 	var s student
-	err := json.NewDecoder(r.Body).Decode(&s)
+	err := context.ShouldBindJSON(&s)
 	if err != nil {
-		sendErr(w, http.StatusBadRequest, err.Error())
+		sendErr(context, http.StatusBadRequest, err.Error())
 		return
 	}
 	s.ID = uuid.New().String()
 	err = a.db.Save(&s).Error
 	if err != nil {
-		sendErr(w, http.StatusInternalServerError, err.Error())
+		sendErr(context, http.StatusInternalServerError, err.Error())
 	} else {
-		w.WriteHeader(http.StatusCreated)
+		context.JSON(http.StatusCreated, "")
 	}
 }
 
-func (a *App) updateStudent(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
+func (a *App) updateStudent(context *gin.Context) {
+	context.Header("Content-Type", "application/json")
 	var s student
-	err := json.NewDecoder(r.Body).Decode(&s)
+	err := context.ShouldBindJSON(&s)
 	if err != nil {
-		sendErr(w, http.StatusBadRequest, err.Error())
-		return;
+		sendErr(context, http.StatusBadRequest, err.Error())
+		return
 	}
-	s.ID = mux.Vars(r)["id"]
+	s.ID = context.Param("id")
 	err = a.db.Save(&s).Error
 	if err != nil {
-		sendErr(w, http.StatusInternalServerError, err.Error())
+		sendErr(context, http.StatusInternalServerError, err.Error())
 	}
 }
 
-func (a *App) deleteStudent(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	err := a.db.Unscoped().Delete(student{ID: mux.Vars(r)["id"]}).Error
+func (a *App) deleteStudent(context *gin.Context) {
+	context.Header("Content-Type", "application/json")
+	id := context.Param("id")
+	err := a.db.Unscoped().Delete(student{ID: id}).Error
 	if err != nil {
-		sendErr(w, http.StatusInternalServerError, err.Error())
+		sendErr(context, http.StatusInternalServerError, err.Error())
 	}
 }
 
-func sendErr(w http.ResponseWriter, code int, message string) {
-	resp, _ := json.Marshal(map[string]string{"error": message})
-	http.Error(w, string(resp), code)
+func sendErr(context *gin.Context, code int, message string) {
+	context.JSON(code, gin.H{"error": message})
 }

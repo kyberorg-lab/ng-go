@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/gorilla/mux"
+	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	"os"
 )
@@ -19,7 +19,7 @@ func main() {
 	}
 	app := App{
 		db: db,
-		r:  mux.NewRouter(),
+		r:  gin.Default(),
 	}
 	app.start()
 }
