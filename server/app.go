@@ -7,6 +7,8 @@ import (
 	_ "github.com/jinzhu/gorm/dialects/postgres"
 	"log"
 	"net/http"
+	"path"
+	"path/filepath"
 )
 
 type student struct {
@@ -27,10 +29,18 @@ func (a *App) start() {
 	a.r.PUT("/students/:id", a.updateStudent)
 	a.r.DELETE("/students/:id", a.deleteStudent)
 
-	a.r.StaticFS("/", http.Dir("./webapp/dist/webapp"))
-
-	//a.r.Static("/", "./webapp/dist/webapp/")
+	a.r.NoRoute(a.serveStatic)
 	log.Fatal(a.r.Run(":8080"))
+}
+
+func (a *App) serveStatic(c *gin.Context) {
+	dir, file := path.Split(c.Request.RequestURI)
+	ext := filepath.Ext(file)
+	if file == "" || ext == "" {
+		c.File("./webapp/dist/webapp/index.html")
+	} else {
+		c.File("./webapp/dist/webapp/" + path.Join(dir, file))
+	}
 }
 
 func (a *App) getAllStudents(context *gin.Context) {
